@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "travelers": [
+    {
+      "travelerId": "3390ba3e-441c-4a77-9445-a8b8d9e706bc",
+      "foodPreferences": ["Vegetarian", "Prefers local Rajasthani food"],
+      "activityInterests": [],
+      "travelPace": "Relaxed",
+      "budgetPreference": "Moderate",
+      "accessibilityRequirements": [],
+      "updatedAt": "2026-08-03T13:25:55.0895423+00:00"
+    },
+    {
+      "travelerId": "f6b8becc-1f23-4613-b958-c5198ffd2120",
+      "foodPreferences": ["vegetarian"],
+      "activityInterests": ["gardens", "museums"],
+      "travelPace": "relaxed",
+      "budgetPreference": "mid-range",
+      "accessibilityRequirements": ["step-free access"],
+      "updatedAt": "2026-08-03T10:24:26.0093513+00:00"
+    }
+  ]
+}

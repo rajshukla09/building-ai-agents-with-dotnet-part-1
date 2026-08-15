@@ -1,0 +1,38 @@
+:root { --app-bg:#f4f6fa; --app-surface:#fff; --app-line:#dbe2ed; --app-radius:14px; --app-shadow:0 5px 20px #1720330c; }
+html, body { font-family: Inter, "Segoe UI", system-ui, sans-serif; background: var(--app-bg); color:#172033; }
+.mud-paper { border-radius:var(--app-radius); }
+.mud-card { border:1px solid var(--app-line); box-shadow:var(--app-shadow); }
+
+.loading {
+    padding: 3rem;
+    text-align: center;
+}
+
+.diagnostic-json {
+    white-space: pre-wrap;
+    overflow: auto;
+    max-height: 32rem;
+    background: #151922;
+    color: #d7e2f0;
+    padding: 1rem;
+    border-radius: 4px;
+    font: 12px monospace;
+}
+
+.executor-card {
+    border-left: 4px solid var(--mud-palette-primary);
+}
+
+#blazor-error-ui {
+    display: none;
+}
+
+.live-node.active-node {
+    border-color: var(--mud-palette-primary) !important;
+    box-shadow: 0 0 0.4rem rgba(89, 74, 226, 0.35);
+}
+.status-running { color:#0369a1; background:#e0f2fe; }
+.status-completed { color:#166534; background:#dcfce7; }
+.status-failed { color:#991b1b; background:#fee2e2; }
+.status-waiting, .status-pending { color:#92400e; background:#fef3c7; }
+.status-cancelled { color:#475569; background:#e2e8f0; }

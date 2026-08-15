@@ -1,0 +1,160 @@
+@page "/workflow-runs/{WorkflowRunId:guid}/live"
+@implements IAsyncDisposable
+@inject ITravelApiClient Api
+@inject IWorkflowLiveClient LiveClient
+@inject IWebAssemblyHostEnvironment HostEnvironment
+
+<PageTitle>Live Workflow Run</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Live Workflow Run</MudText>
+<MudText Typo="Typo.body2"><b>Workflow run ID:</b> @WorkflowRunId</MudText>
+<MudText Typo="Typo.body2"><b>Connection:</b> @LiveClient.ConnectionStatus</MudText>
+<MudText Typo="Typo.body2"><b>Workflow status:</b> @_workflowStatus</MudText>
+<MudText Typo="Typo.body2"><b>Active stage:</b> @(_activeStage ?? "None")</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-3">
+        <b>@_error.Message</b>
+        @if (HostEnvironment.Environment == "Development" && !string.IsNullOrWhiteSpace(_error.JsonPath)) { <span> Path: @_error.JsonPath</span> }
+    </MudAlert>
+}
+
+<MudGrid Class="mt-3">
+    <MudItem xs="12" md="7">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" GutterBottom="true">Workflow topology</MudText>
+            @foreach (WorkflowNodeDto node in TopologyNodes)
+            {
+                WorkflowLiveEventDto? latest = LatestFor(node.Name);
+                string status = latest?.Status.ToString() ?? "Waiting";
+                <MudPaper Outlined="true" Class="@NodeClass(status)">
+                    <MudText Typo="Typo.subtitle1"><b>@node.Name</b></MudText>
+                    <MudText Typo="Typo.caption">Type: @node.NodeType</MudText><br />
+                    <MudText Typo="Typo.caption">Uses: @node.Uses</MudText><br />
+                    <MudText Typo="Typo.caption">@node.InputMessageType → @node.OutputMessageType</MudText><br />
+                    <MudChip T="string" Color="@StatusColor(status)" Size="Size.Small">@status</MudChip>
+                    @if (latest?.DurationMs is long ms) { <MudText Typo="Typo.caption"> Duration: @ms ms</MudText> }
+                    @foreach (WorkflowLiveEventDto child in ChildEvents(node.Name))
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-4">@child.StageName — @child.Status: @child.Summary</MudText>
+                    }
+                </MudPaper>
+                @if (node.Order < (_topology?.Nodes.Count ?? 0)) { <MudText Align="Align.Center">↓</MudText> }
+            }
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4 mb-3" Elevation="2">
+            <MudText Typo="Typo.h6">Message transitions</MudText>
+            @foreach (WorkflowLiveEventDto item in _events.Where(e => e.EventType == WorkflowLiveEventType.MessageProduced).OrderBy(e => e.Sequence))
+            {
+                <MudText Typo="Typo.body2">@item.InputMessageType ↓ @item.OutputMessageType</MudText>
+                <MudText Typo="Typo.caption">@item.Summary</MudText>
+            }
+        </MudPaper>
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6">Live event stream</MudText>
+            <MudList T="WorkflowLiveEventDto" Dense="true">
+                @foreach (WorkflowLiveEventDto item in _events.OrderByDescending(e => e.Sequence))
+                {
+                    <MudListItem T="WorkflowLiveEventDto">
+                        #@item.Sequence @item.EventType — @item.StageName — @item.Status<br />
+                        <small>@item.Summary</small>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@if (_details is not null)
+{
+    <MudPaper Class="pa-4 mt-3" Elevation="2">
+        <MudText Typo="Typo.h6">Final result</MudText>
+        @if (!string.IsNullOrWhiteSpace(_details.TripPlanJson))
+        {
+            <pre class="diagnostic-json">@_details.TripPlanJson</pre>
+        }
+        @if (!string.IsNullOrWhiteSpace(_details.Error))
+        {
+            <MudAlert Severity="Severity.Error">@_details.Error</MudAlert>
+        }
+        <MudExpansionPanels>
+            <MudExpansionPanel Text="Persisted executor traces and tool traces">
+                <pre class="diagnostic-json">@JsonSerializer.Serialize(_details, TravelApiClient.JsonOptions)</pre>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid WorkflowRunId { get; set; }
+    private WorkflowTopologyDto? _topology;
+    private readonly List<WorkflowLiveEventDto> _events = [];
+    private readonly HashSet<long> _seenSequences = [];
+    private WorkflowRunDetailsDto? _details;
+    private ApiFailure? _error;
+    private string _workflowStatus = "Queued";
+    private string? _activeStage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LiveClient.EventReceived += OnEventReceivedAsync;
+        _topology = (await Api.GetTopologyAsync()).Value;
+        await ReplayMissedEventsAsync();
+        await LiveClient.ConnectAsync(WorkflowRunId);
+        await ReplayMissedEventsAsync();
+    }
+
+    private async Task ReplayMissedEventsAsync()
+    {
+        ApiResult<IReadOnlyList<WorkflowLiveEventDto>> result = await Api.GetEventsAsync(WorkflowRunId, _seenSequences.Count == 0 ? 0 : _seenSequences.Max());
+        if (result.Value is not null)
+            foreach (WorkflowLiveEventDto liveEvent in result.Value) ApplyEvent(liveEvent);
+        else if (result.Failure is not null) _error = result.Failure;
+    }
+
+    private async Task OnEventReceivedAsync(WorkflowLiveEventDto liveEvent)
+    {
+        ApplyEvent(liveEvent);
+        if (IsTerminal(liveEvent))
+        {
+            ApiResult<WorkflowRunDetailsDto> details = await Api.GetRunDetailsAsync(WorkflowRunId);
+            _details = details.Value;
+            _error = details.Failure;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplyEvent(WorkflowLiveEventDto liveEvent)
+    {
+        if (liveEvent.WorkflowRunId != WorkflowRunId || !_seenSequences.Add(liveEvent.Sequence)) return;
+        _events.Add(liveEvent);
+        _workflowStatus = liveEvent.Status.ToString();
+        if (liveEvent.Status == WorkflowStageStatus.Running) _activeStage = liveEvent.StageName;
+    }
+
+    private IEnumerable<WorkflowNodeDto> TopologyNodes => _topology?.Nodes.OrderBy(n => n.Order) ?? Enumerable.Empty<WorkflowNodeDto>();
+
+    private WorkflowLiveEventDto? LatestFor(string nodeName) =>
+        _events.Where(e => e.StageType == WorkflowStageType.Executor && e.StageName == nodeName).OrderByDescending(e => e.Sequence).FirstOrDefault();
+
+    private IEnumerable<WorkflowLiveEventDto> ChildEvents(string nodeName) => nodeName switch
+    {
+        "ExecutionPlanValidationExecutor" => _events.Where(e => e.StageName == "Repair Agent"),
+        "ToolExecutionExecutor" => _events.Where(e => e.StageType == WorkflowStageType.Tool),
+        "TravelAgentExecutor" => _events.Where(e => e.StageName == "Travel Agent"),
+        _ => []
+    };
+
+    private static string NodeClass(string status) => status == "Running" ? "pa-3 mb-2 live-node active-node" : "pa-3 mb-2 live-node";
+    private static bool IsTerminal(WorkflowLiveEventDto liveEvent) => liveEvent.EventType is WorkflowLiveEventType.WorkflowCompleted or WorkflowLiveEventType.WorkflowFailed or WorkflowLiveEventType.WorkflowCancelled;
+    private static Color StatusColor(string status) => status switch { "Completed" => Color.Success, "Running" => Color.Info, "Failed" => Color.Error, "Cancelled" => Color.Warning, _ => Color.Default };
+
+    public async ValueTask DisposeAsync()
+    {
+        LiveClient.EventReceived -= OnEventReceivedAsync;
+        await LiveClient.DisconnectAsync();
+    }
+}

@@ -1,0 +1,270 @@
+using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using SmartTravelPlanner.Api.Contracts;
+using SmartTravelPlanner.Api.Conversations;
+using SmartTravelPlanner.Api.Models.Conversations;
+using SmartTravelPlanner.Api.Models.TravelPlanning;
+using Xunit;
+
+namespace SmartTravelPlanner.Api.Tests;
+
+public sealed class ConversationEndpointTests
+{
+    [Fact]
+    public async Task CreateConversationReturnsCreatedMetadata()
+    {
+        using TestApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        HttpResponseMessage response = await client.PostAsync("/api/conversations", null);
+        ConversationMetadata? conversation = await response.Content.ReadFromJsonAsync<ConversationMetadata>();
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(conversation);
+        Assert.NotEqual(Guid.Empty, conversation.ConversationId);
+        Assert.Equal(0, conversation.MessageCount);
+        Assert.Equal(SessionStatus.Created, conversation.Status);
+        Assert.NotNull(response.Headers.Location);
+    }
+
+    [Fact]
+    public async Task MultipleMessagesReuseConversationContext()
+    {
+        using TestApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+        ConversationMetadata conversation = await CreateConversationAsync(client);
+
+        await SendMessageAsync(client, conversation.ConversationId, "Plan a three-day trip to Jaipur.");
+        TripPlan revisedPlan = await SendMessageAsync(client, conversation.ConversationId, "Make Day 2 less busy.");
+        ConversationMetadata? metadata = await client.GetFromJsonAsync<ConversationMetadata>(
+            $"/api/conversations/{conversation.ConversationId}");
+
+        Assert.Contains("Plan a three-day trip to Jaipur.", revisedPlan.Summary);
+        Assert.Contains("Make Day 2 less busy.", revisedPlan.Summary);
+        Assert.Equal(2, metadata?.MessageCount);
+    }
+
+    [Fact]
+    public async Task ConversationsRemainIsolated()
+    {
+        using TestApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+        ConversationMetadata first = await CreateConversationAsync(client);
+        ConversationMetadata second = await CreateConversationAsync(client);
+
+        await SendMessageAsync(client, first.ConversationId, "Plan Jaipur.");
+        TripPlan secondPlan = await SendMessageAsync(client, second.ConversationId, "Plan Kyoto.");
+
+        Assert.Contains("Plan Kyoto.", secondPlan.Summary);
+        Assert.DoesNotContain("Jaipur", secondPlan.Summary);
+    }
+
+    [Fact]
+    public async Task UnknownConversationReturnsNotFound()
+    {
+        using TestApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+        Guid unknownId = Guid.NewGuid();
+
+        HttpResponseMessage getResponse = await client.GetAsync($"/api/conversations/{unknownId}");
+        HttpResponseMessage messageResponse = await client.PostAsJsonAsync(
+            $"/api/conversations/{unknownId}/messages",
+            new ConversationMessageRequest("Plan Jaipur."));
+
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, messageResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteConversationRemovesIt()
+    {
+        using TestApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+        ConversationMetadata conversation = await CreateConversationAsync(client);
+
+        HttpResponseMessage deleteResponse = await client.DeleteAsync(
+            $"/api/conversations/{conversation.ConversationId}");
+        HttpResponseMessage getResponse = await client.GetAsync(
+            $"/api/conversations/{conversation.ConversationId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task SessionEndpointsListExpireAndCleanUpSessions()
+    {
+        using TestApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+        ConversationMetadata session = await CreateConversationAsync(client);
+
+        ConversationMetadata[]? sessions = await client.GetFromJsonAsync<ConversationMetadata[]>("/api/sessions");
+        HttpResponseMessage expireResponse = await client.PostAsync(
+            $"/api/sessions/{session.ConversationId}/expire",
+            null);
+        HttpResponseMessage messageResponse = await client.PostAsJsonAsync(
+            $"/api/conversations/{session.ConversationId}/messages",
+            new ConversationMessageRequest("Follow up"));
+        SessionCleanupResult? cleanup = await (await client.PostAsync("/api/sessions/cleanup", null))
+            .Content.ReadFromJsonAsync<SessionCleanupResult>();
+
+        Assert.Contains(sessions!, item => item.ConversationId == session.ConversationId);
+        Assert.Equal(HttpStatusCode.NoContent, expireResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, messageResponse.StatusCode);
+        Assert.Equal(1, cleanup?.RemovedCount);
+    }
+
+    private static async Task<ConversationMetadata> CreateConversationAsync(HttpClient client)
+    {
+        HttpResponseMessage response = await client.PostAsync("/api/conversations", null);
+        return (await response.Content.ReadFromJsonAsync<ConversationMetadata>())!;
+    }
+
+    private static async Task<TripPlan> SendMessageAsync(HttpClient client, Guid id, string message)
+    {
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            $"/api/conversations/{id}/messages",
+            new ConversationMessageRequest(message));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TripPlan>())!;
+    }
+
+    private sealed class TestApplicationFactory : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["AzureOpenAI:Endpoint"] = "https://example.openai.azure.com/",
+                    ["AzureOpenAI:ApiKey"] = "test-key",
+                    ["AzureOpenAI:DeploymentName"] = "test-deployment"
+                }));
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IConversationService>();
+                services.AddSingleton<IConversationService, FakeConversationService>();
+            });
+        }
+    }
+
+    private sealed class FakeConversationService : IConversationService
+    {
+        private readonly ConcurrentDictionary<Guid, TestConversation> _conversations = new();
+
+        public Task<ConversationMetadata> CreateAsync(CancellationToken cancellationToken = default)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            TestConversation conversation = new(Guid.NewGuid(), now);
+            _conversations[conversation.Id] = conversation;
+            return Task.FromResult(conversation.Metadata);
+        }
+
+        public ConversationMetadata? Get(Guid conversationId) =>
+            _conversations.TryGetValue(conversationId, out TestConversation? conversation)
+                ? conversation.Metadata
+                : null;
+
+        public Task<SendMessageResult> SendMessageAsync(
+            Guid conversationId,
+            string message,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_conversations.TryGetValue(conversationId, out TestConversation? conversation))
+            {
+                return Task.FromResult(new SendMessageResult(SendMessageOutcome.NotFound));
+            }
+
+            if (conversation.Metadata.Status == SessionStatus.Expired)
+            {
+                return Task.FromResult(new SendMessageResult(SendMessageOutcome.Expired));
+            }
+
+            conversation.Messages.Add(message);
+            conversation.Metadata = conversation.Metadata with
+            {
+                LastActivityAt = DateTimeOffset.UtcNow,
+                ExpirationTime = DateTimeOffset.UtcNow.AddMinutes(30),
+                MessageCount = conversation.Messages.Count,
+                Status = SessionStatus.Active
+            };
+            return Task.FromResult(new SendMessageResult(
+                SendMessageOutcome.Success,
+                CreatePlan(string.Join(" ", conversation.Messages))));
+        }
+
+        public IReadOnlyCollection<ConversationMetadata> ListActive() =>
+            _conversations.Values.Select(conversation => conversation.Metadata).ToArray();
+
+        public bool Expire(Guid conversationId)
+        {
+            if (!_conversations.TryGetValue(conversationId, out TestConversation? conversation))
+            {
+                return false;
+            }
+
+            conversation.Metadata = conversation.Metadata with
+            {
+                ExpirationTime = DateTimeOffset.UtcNow,
+                Status = SessionStatus.Expired
+            };
+            return true;
+        }
+
+        public bool Delete(Guid conversationId) => _conversations.TryRemove(conversationId, out _);
+
+        public int CleanupExpired()
+        {
+            Guid[] expired = _conversations
+                .Where(item => item.Value.Metadata.Status == SessionStatus.Expired)
+                .Select(item => item.Key)
+                .ToArray();
+            return expired.Count(Delete);
+        }
+
+        private static TripPlan CreatePlan(string summary) => new()
+        {
+            Destination = "Test destination",
+            DurationDays = 1,
+            Summary = summary,
+            Days =
+            [
+                new TripDay
+                {
+                    DayNumber = 1,
+                    Title = "Test day",
+                    Activities =
+                    [
+                        new TripActivity
+                        {
+                            Time = "09:00",
+                            Name = "Test activity",
+                            Description = "Test description",
+                            Category = "Sightseeing",
+                            Notes = ""
+                        }
+                    ]
+                }
+            ]
+        };
+
+        private sealed class TestConversation(Guid id, DateTimeOffset createdAt)
+        {
+            public Guid Id { get; } = id;
+            public List<string> Messages { get; } = [];
+            public ConversationMetadata Metadata { get; set; } = new(
+                id,
+                createdAt,
+                createdAt,
+                createdAt.AddMinutes(30),
+                0,
+                SessionStatus.Created);
+        }
+    }
+}

@@ -1,0 +1,25 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartTravelPlanner.Api", "src\SmartTravelPlanner.Api\SmartTravelPlanner.Api.csproj", "{7B87BCDD-BD23-491D-A38F-A42A6413AD3D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartTravelPlanner.Api.Tests", "tests\SmartTravelPlanner.Api.Tests\SmartTravelPlanner.Api.Tests.csproj", "{0DF13E75-E94A-4533-A366-7E3AE5454E33}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7B87BCDD-BD23-491D-A38F-A42A6413AD3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B87BCDD-BD23-491D-A38F-A42A6413AD3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B87BCDD-BD23-491D-A38F-A42A6413AD3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B87BCDD-BD23-491D-A38F-A42A6413AD3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0DF13E75-E94A-4533-A366-7E3AE5454E33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0DF13E75-E94A-4533-A366-7E3AE5454E33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0DF13E75-E94A-4533-A366-7E3AE5454E33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0DF13E75-E94A-4533-A366-7E3AE5454E33}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "travelers": [
+    {
+      "travelerId": "f6b8becc-1f23-4613-b958-c5198ffd2120",
+      "foodPreferences": ["vegetarian"],
+      "activityInterests": ["gardens", "museums"],
+      "travelPace": "relaxed",
+      "budgetPreference": "mid-range",
+      "accessibilityRequirements": ["step-free access"],
+      "updatedAt": "2026-08-03T10:24:26.0093513+00:00"
+    }
+  ]
+}

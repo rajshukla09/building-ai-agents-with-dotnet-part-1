@@ -1,0 +1,103 @@
+@page "/"
+@inject ITravelApiClient Api
+@inject NavigationManager Navigation
+@inject IWebAssemblyHostEnvironment HostEnvironment
+
+<PageTitle>Plan a Trip</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Plan a Trip</MudText>
+<MudText Color="Color.Secondary" GutterBottom="true">
+    Run the Chapter 10 Microsoft Agent Framework workflow and inspect its typed executor boundaries.
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" GutterBottom="true">Trip request</MudText>
+            <EditForm Model="_form" OnValidSubmit="RunWorkflowAsync">
+                <DataAnnotationsValidator />
+                <MudTextField @bind-Value="_form.Destination" Label="Destination" Required="true" MaxLength="100" />
+                <MudNumericField T="int" @bind-Value="_form.DurationDays" Label="Duration Days" Min="1" Max="14" />
+                <MudTextField @bind-Value="_form.Preferences" Label="Preferences" Lines="5" MaxLength="500" Counter="500" />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="_running" StartIcon="@Icons.Material.Filled.PlayArrow" Class="mt-4">
+                    Run Workflow
+                </MudButton>
+            </EditForm>
+            @if (_running)
+            {
+                <MudProgressLinear Indeterminate="true" Class="mt-4" />
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+                <b>@ErrorTitle(_error)</b> @_error.Message
+                @if (HostEnvironment.Environment == "Development" && !string.IsNullOrWhiteSpace(_error.JsonPath))
+                {
+                    <span> Path: @_error.JsonPath</span>
+                }
+            </MudAlert>
+            <MudPaper Class="pa-4 mt-3" Outlined="true">
+                <MudText Typo="Typo.subtitle1"><b>Submitted request</b></MudText>
+                <MudText>Destination: @_submittedRequest?.Destination</MudText>
+                <MudText>Duration Days: @_submittedRequest?.DurationDays</MudText>
+                <MudText>Preferences: @_submittedRequest?.Preferences</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Class="pa-8 text-center" Outlined="true">
+                <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" />
+                <MudText>Run the workflow to see the TripPlan and executor trace.</MudText>
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly FormModel _form = new();
+    private bool _running;
+    private ApiFailure? _error;
+    private TravelPlanRequest? _submittedRequest;
+
+    private async Task RunWorkflowAsync()
+    {
+        _running = true;
+        _error = null;
+        _submittedRequest = new(_form.Destination.Trim(), _form.DurationDays, _form.Preferences);
+        ApiResult<StartWorkflowRunResponse> result = await Api.StartWorkflowRunAsync(_submittedRequest, CancellationToken.None);
+        _running = false;
+        if (result.Value is not null)
+            Navigation.NavigateTo($"/workflow-runs/{result.Value.WorkflowRunId}/live");
+        else
+            _error = result.Failure;
+    }
+
+    private static string ErrorTitle(ApiFailure error) => error.Kind switch
+    {
+        ApiFailureKind.ApiUnavailable => "API unavailable",
+        ApiFailureKind.HttpErrorResponse => $"HTTP error response (HTTP {error.StatusCode})",
+        ApiFailureKind.RequestTimeout => "Request timeout",
+        ApiFailureKind.RequestCancelled => "Request cancelled",
+        ApiFailureKind.InvalidApiResponse => "Invalid or incompatible API response",
+        ApiFailureKind.WorkflowFailure => $"Workflow failure (HTTP {error.StatusCode})",
+        _ => "API call failed"
+    };
+
+    private sealed class FormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.StringLength(100)]
+        public string Destination { get; set; } = "Jaipur";
+
+        [System.ComponentModel.DataAnnotations.Range(1, 14)]
+        public int DurationDays { get; set; } = 3;
+
+        [System.ComponentModel.DataAnnotations.StringLength(500)]
+        public string Preferences { get; set; } =
+            "Use the current weather, convert 500 USD to INR, and include the distance from Hyderabad.";
+    }
+}

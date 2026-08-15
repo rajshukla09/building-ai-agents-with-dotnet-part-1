@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Travel Planner — Streaming Conversations</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">Chapter 3 · Conversations That Continue</p>
+      <h1>Streaming travel assistant</h1>
+      <p>User → API → MAF <code>RunStreamingAsync</code> → streaming updates → UI</p>
+    </header>
+
+    <section class="card" aria-label="Conversation">
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <form id="message-form">
+        <label for="message">Ask the travel assistant</label>
+        <textarea id="message" rows="3" required placeholder="Plan three days in Jaipur."></textarea>
+        <div class="actions">
+          <button id="send" type="submit">Send</button>
+          <button id="stop" type="button" class="secondary" hidden>Stop</button>
+          <span id="status" class="status" data-state="ready">Ready</span>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script src="/js/app.js"></script>
+</body>
+</html>

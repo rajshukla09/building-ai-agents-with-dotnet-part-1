@@ -1,0 +1,25 @@
+:root { color-scheme: light; font-family: Inter, "Segoe UI", system-ui, sans-serif; color: #172033; background: #f4f6fa; --surface: #fff; --line: #dbe2ed; --radius: 14px; --shadow: 0 5px 20px #1720330c; --primary: #0369a1; --running: #0369a1; --completed: #166534; --failed: #991b1b; --waiting: #92400e; --cancelled: #475569; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.shell { width: min(820px, calc(100% - 2rem)); margin: 3rem auto; }
+header { margin-bottom: 1.5rem; }
+h1 { margin: .2rem 0 .5rem; font-size: clamp(2rem, 6vw, 3.25rem); }
+.eyebrow { color: #3264d6; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.messages { min-height: 280px; max-height: 55vh; overflow-y: auto; padding: 1.25rem; display: grid; gap: .85rem; align-content: start; }
+.message { max-width: 85%; padding: .85rem 1rem; border-radius: 14px; white-space: pre-wrap; line-height: 1.45; }
+.message.user { justify-self: end; background: #3264d6; color: white; border-bottom-right-radius: 4px; }
+.message.assistant { background: #eef2f8; border-bottom-left-radius: 4px; }
+form { padding: 1rem 1.25rem 1.25rem; border-top: 1px solid #e5eaf2; }
+label { display: block; font-weight: 700; margin-bottom: .5rem; }
+textarea { width: 100%; resize: vertical; border: 1px solid #bcc8da; border-radius: 10px; padding: .75rem; font: inherit; }
+.actions { display: flex; align-items: center; gap: .65rem; margin-top: .75rem; }
+button { border: 0; border-radius: 9px; padding: .7rem 1rem; background: #3264d6; color: white; font-weight: 700; cursor: pointer; }
+button.secondary { background: #d33f49; }
+button:disabled { opacity: .55; cursor: wait; }
+.status { margin-left: auto; font-size: .9rem; font-weight: 700; color: #536079; }
+.status[data-state="generating"] { color: var(--running); }
+.status[data-state="completed"] { color: var(--completed); }
+.status[data-state="cancelled"] { color: var(--cancelled); }
+.status[data-state="failed"] { color: var(--failed); }
+code { background: #e9edf5; border-radius: 5px; padding: .1rem .3rem; }

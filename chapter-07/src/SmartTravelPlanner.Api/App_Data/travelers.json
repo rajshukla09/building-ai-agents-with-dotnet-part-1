@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "travelers": [
+    {
+      "travelerId": "b465fc70-63ca-4370-b64e-4dbc86f75535",
+      "createdAt": "2026-08-03T10:20:45.5630335+00:00"
+    },
+    {
+      "travelerId": "f6b8becc-1f23-4613-b958-c5198ffd2120",
+      "createdAt": "2026-08-03T10:24:07.9316213+00:00"
+    }
+  ]
+}

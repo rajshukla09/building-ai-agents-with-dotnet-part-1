@@ -1,0 +1,51 @@
+# .NET build output
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+coverage.*
+*.trx
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.slnLaunch.user
+
+# Rider and JetBrains
+.idea/
+*.sln.iml
+
+# Visual Studio Code
+.vscode/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+*.secrets.json
+
+# Local databases and generated state
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Generated documents and temporary files
+*.pdf
+*.bak
+*.tmp
+*.temp
+~$*
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
