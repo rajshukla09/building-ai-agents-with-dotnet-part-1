@@ -74,7 +74,19 @@ Replace `chapter-01` with the chapter you want to explore. Begin with the chapte
 
 ## Part 2
 
-Part 2 continues beyond these foundations into more advanced agentic architecture and production scenarios. Its source will be published separately.
+Continue the series with:
+
+### Building AI Agents with .NET — Part 2
+
+**Advanced Agentic Architecture and Production Workflows**
+
+Part 2 moves beyond the foundations into human-in-the-loop workflows, MCP, multi-agent orchestration, durable workflows, OpenTelemetry, Agent-to-Agent (A2A) communication, and production-ready context engineering.
+
+📘 **Book:**  
+https://www.amazon.com/dp/B0HJHDMCZB
+
+💻 **GitHub Companion Repository:**  
+https://github.com/rajshukla09/building-ai-agents-with-dotnet-part-2
 
 ## Author
 
