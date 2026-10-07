@@ -15,20 +15,22 @@ https://www.amazon.com/dp/B0HFMX5V9P
 
 ## What You'll Build
 
-Throughout the book and this repository, you'll progressively build a production-oriented AI agent while exploring:
+## From First Agent to Production-Ready Workflows
 
-- **AI agents with Microsoft Agent Framework and C#**
-- **Structured outputs** for predictable agent responses
-- **Multi-turn conversations and agent sessions**
-- **Persistent conversation state**
-- **Tool-enabled agents**
-- **Memory-aware agents**
-- **Context providers**
-- **Reliable tool execution**
-- **Agent workflows**
-- **Production-oriented .NET architecture**
+The book progressively evolves a simple AI agent into a more capable, production-oriented agentic application.
 
-Rather than presenting isolated examples, the chapters progressively evolve the same application so you can see how an agent moves from a simple implementation toward a more production-ready architecture.
+```mermaid
+flowchart LR
+    A["01<br/>First Agent"] --> B["02<br/>Structured<br/>Outputs"]
+    B --> C["03–05<br/>Sessions &<br/>Persistence"]
+    C --> D["06<br/>Tools"]
+    D --> E["07<br/>Memory"]
+    E --> F["08<br/>Context"]
+    F --> G["09<br/>Reliable Tool<br/>Execution"]
+    G --> H["10<br/>Agent<br/>Workflows"]
+```
+
+**The progression:** Agent → Structure → State → Tools → Memory → Context → Reliability → Workflows
 
 ## Chapter Map
 
